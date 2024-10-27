@@ -1,0 +1,66 @@
+name: workspace
+
+services:
+  keycloak:
+    image: keycloak
+    container_name: keycloak
+    build:
+      context: .
+      dockerfile: keycloak/Dockerfile
+    #command: ["start", "--optimized"]
+    command: ["start-dev"]
+    ports:
+      - 9000:9000
+      - 8080:8080
+      - 8443:8443
+    environment:
+      KC_DB: mssql
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_URL_HOST: mssql
+      KC_DB_URL_PORT: 1433
+      KC_DB_URL_PROPERTIES: ";trustServerCertificate=false;encrypt=false"
+      KC_DB_USERNAME: sa
+      KC_DB_PASSWORD: Password123!
+      KC_HOSTNAME: localhost
+      KC_PROXY: edge
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    depends_on:
+      mssql-tools:
+        condition: service_completed_successfully
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: mssql
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "Password123!"
+      ACCEPT_EULA: "Y"
+    healthcheck:
+        test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Password123! -C -Q "SELECT 1" || exit 1
+        interval: 10s
+        timeout: 10s
+        retries: 5
+    volumes:
+      - mssql-data:/var/opt/mssql
+
+  mssql-tools:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: mssql-tools
+    environment:
+      DB_USERNAME: sa
+      DB_PASSWORD: Password123!
+    command: >
+      sh -c "echo 'Creating database' &&
+        until /opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P Password123! -C -Q 'CREATE DATABASE keycloak'; do sleep 1; done &&
+        echo 'Database created' &&
+        exit 0"
+    tty: true
+    depends_on:
+      mssql:
+        condition: service_healthy
+
+volumes:
+  mssql-data:
