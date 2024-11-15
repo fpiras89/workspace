@@ -28,6 +28,11 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_TRACING_ENDPOINT: http://otel-collector:4318
       KC_TRACING_PROTOCOL: http/protobuf
+      KC_LOG: console,file
+      KC_LOG_CONSOLE_FORMAT: ts="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}" level="%p" logger="%c" thread="%t" thread_id="%t{id}" msg="%s"%n
+      KC_LOG_FILE_FORMAT: ts="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}" level="%p" logger="%c" thread="%t" thread_id="%t{id}" msg="%s"%n
+    volumes:
+      - ./.logs/keycloak:/opt/keycloak/data/log
     depends_on:
       mssql-tools:
         condition: service_completed_successfully
@@ -84,6 +89,7 @@ services:
       - tempo
       - prometheus
       - loki
+      - fluent-bit
 
   tempo:
     image: grafana/tempo:latest
@@ -128,6 +134,14 @@ services:
       GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
     ports:
       - "3000:3000"
+
+  fluent-bit:
+    image: fluent/fluent-bit
+    container_name: fluent-bit
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./parsers.conf:/fluent-bit/etc/parsers.conf
+      - ./.logs:/var/log/containers
 
 volumes:
   mssql-data:
