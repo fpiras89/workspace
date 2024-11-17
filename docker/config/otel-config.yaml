@@ -7,16 +7,19 @@ receivers:
   otlp:
     protocols:
       grpc:
+        endpoint: 0.0.0.0:4317
       http:
+        endpoint: 0.0.0.0:4318
         include_metadata: true
         cors:
           allowed_origins:
-            - http://localhost:4200 # Angular SPA
+            - http://localhost:4200 # Angular/React SPA
           max_age: 7200
-  zipkin:
 
 processors:
   batch:
+    timeout: 1s
+    send_batch_size: 1024
 
 exporters:
   debug:
@@ -27,34 +30,33 @@ exporters:
     path: /log/otel/metrics.log
   file/logs:
     path: /log/otel/logs.log
-  otlp:
+  otlp/tempo:
     endpoint: "${TEMPO_ENDPOINT}"
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: "${LOKI_ENDPOINT}"
     tls:
       insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
-  loki:
-    endpoint: "${LOKI_ENDPOINT}"
-    tls:
-      insecure: true
-
+    
 service:
   pipelines:
     traces:
       receivers:
         - otlp
-        - zipkin
       processors: [batch]
       exporters:
         - debug 
         - file/traces
-        - otlp
+        - otlp/tempo
     metrics:
       receivers:
         - otlp
       processors: [batch]
       exporters:
-        - debug 
+        - debug
         - file/metrics
         - prometheus
     logs:
@@ -62,9 +64,9 @@ service:
         - otlp
       processors: [batch]
       exporters:
-        - debug 
+        - debug
         - file/logs
-        - loki
+        - otlphttp/loki
   extensions:
     - health_check
     - zpages
